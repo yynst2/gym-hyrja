@@ -16,7 +16,8 @@ class HyrjaEnv(gym.Env):
 
     def __init__(self):
         self.timespan = 0.02
-        self.buff = 4.2
+        # self.buff = 4.2
+        self.buff = 3.5
         self.boss_speed = 12
         self.boss_hp = 82234248
         self.boss_dps = 500000
@@ -25,14 +26,16 @@ class HyrjaEnv(gym.Env):
         self.dd_dps = 1000000
         self.dd_move_discount = 0.4
         self.melee_attack_range = 8
-        self.ranged_attack_range = 40
+        # self.ranged_attack_range = 40
+        self.ranged_attack_range = 10
         self.healer_hps = 1000000
         self.healer_move_discount = 0.4
         self.tank_spell_coeff = 0.7
         self.tank_melee_coeff = 0.2
         self.tank_dps = 500000
         self.tank_threat_coeff = 5.0
-        self.player_speed = 8
+        # self.player_speed = 8
+        self.player_speed = 4
         self.sanctify_damage = 170625
         self.sanctify_splash_damage = 121875
         self.sanctify_orb_speed = 5
@@ -59,7 +62,7 @@ class HyrjaEnv(gym.Env):
                                                spaces.Box(low=0, high=9.01, shape=2), # CH: Sanctify / Eye of the Storm
                                                spaces.Box(low=0, high=4.5, shape=2), # CH: Expel Light / Arcing Bolt
                                                spaces.Box(low=0, high=3, shape=5),  # EX: Expel Light
-                                               spaces.Box(low=0, high=1.3, shape=5),  # EX: Arcing Bolt Target
+                                               spaces.Box(low=0, high=1.3, shape=5),  # EX: Arcing Bolt Target   # high=1
                                                spaces.Box(low=0, high=100, shape=2), # Mystic Empowerment
                                                spaces.Box(low=0, high=1, shape=5), # Damage Statistics
                                                spaces.Box(low=0, high=1, shape=6))) # HP
@@ -264,21 +267,27 @@ class HyrjaEnv(gym.Env):
 
         # player dealing dmg
         if tank_hp > 0 and self.point_distance(pos[0], pos[1], pos[10], pos[11]) <= self.melee_attack_range:
-          dmg = self.np_random.uniform(low=0.5, high=1.5, size=(1,))[0] * self.tank_dps * self.timespan / (self.boss_hp * self.buff)
+          #dmg = self.np_random.uniform(low=0.5, high=1.5, size=(1,))[0] * self.tank_dps * self.timespan / (self.boss_hp * self.buff)
+          dmg = self.tank_dps * self.timespan / (
+          self.boss_hp * self.buff)
           if dmg > boss_hp:
             dmg = boss_hp
           stat[0] = stat[0] + dmg
           boss_hp = boss_hp - dmg
           reward = reward + dmg
         if warrior_hp > 0 and self.point_distance(pos[2], pos[3], pos[10], pos[11]) <= self.melee_attack_range:
-          dmg = self.np_random.uniform(low=0.5, high=1.5, size=(1,))[0] * self.dd_dps * self.timespan / (self.boss_hp * self.buff)
+          # dmg = self.np_random.uniform(low=0.5, high=1.5, size=(1,))[0] * self.dd_dps * self.timespan / (self.boss_hp * self.buff)
+          dmg =  self.dd_dps * self.timespan / (
+          self.boss_hp * self.buff)
           if dmg > boss_hp:
             dmg = boss_hp
           stat[1] = stat[1] + dmg
           boss_hp = boss_hp - dmg
           reward = reward + dmg
         if mage_hp > 0 and self.point_distance(pos[4], pos[5], pos[10], pos[11]) <= self.ranged_attack_range:
-          dmg = self.np_random.uniform(low=0.5, high=1.5, size=(1,))[0] * self.dd_dps * self.timespan / (self.boss_hp * self.buff)
+          # dmg = self.np_random.uniform(low=0.5, high=1.5, size=(1,))[0] * self.dd_dps * self.timespan / (self.boss_hp * self.buff)
+          dmg = self.dd_dps * self.timespan / (
+              self.boss_hp * self.buff)
           if move[2] > 0:
             dmg = dmg * self.dd_move_discount
           if dmg > boss_hp:
@@ -287,7 +296,9 @@ class HyrjaEnv(gym.Env):
           boss_hp = boss_hp - dmg
           reward = reward + dmg
         if hunter_hp > 0 and self.point_distance(pos[6], pos[7], pos[10], pos[11]) <= self.ranged_attack_range:
-          dmg = self.np_random.uniform(low=0.5, high=1.5, size=(1,))[0] * self.dd_dps * self.timespan / (self.boss_hp * self.buff)
+          # dmg = self.np_random.uniform(low=0.5, high=1.5, size=(1,))[0] * self.dd_dps * self.timespan / (self.boss_hp * self.buff)
+          dmg = self.dd_dps * self.timespan / (
+              self.boss_hp * self.buff)
           if dmg > boss_hp:
             dmg = boss_hp
           stat[3] = stat[3] + dmg
@@ -303,7 +314,8 @@ class HyrjaEnv(gym.Env):
             heal_dist[x] = -1
         heal_target = np.argmax(heal_dist)
         if priest_hp > 0:
-          heal = self.np_random.uniform(low=0.5, high=1.5, size=(1,))[0] * self.healer_hps * self.timespan
+          # heal = self.np_random.uniform(low=0.5, high=1.5, size=(1,))[0] * self.healer_hps * self.timespan
+          heal = self.healer_hps * self.timespan
           if heal_target == 0:
             heal = heal / self.tank_hp
           else:
@@ -327,7 +339,8 @@ class HyrjaEnv(gym.Env):
           if self.point_distance(pos[2*boss_target], pos[2*boss_target+1], pos[10], pos[11]) > self.melee_attack_range:
             pos[10], pos[11] = self.move_towards_point(pos[10], pos[11], pos[2*boss_target], pos[2*boss_target+1], self.boss_speed, True)
           else:
-            dmg = self.np_random.uniform(low=0.5, high=1.5, size=(1,))[0] * self.boss_dps * self.timespan * self.buff
+            # dmg = self.np_random.uniform(low=0.5, high=1.5, size=(1,))[0] * self.boss_dps * self.timespan * self.buff
+            dmg =  self.boss_dps * self.timespan * self.buff
             if boss_target == 0:
               dmg = dmg * self.tank_melee_coeff / self.tank_hp
             else:
@@ -401,7 +414,8 @@ class HyrjaEnv(gym.Env):
               self.steps_beyond_done = 0
           else:
               if self.steps_beyond_done == 0:
-                  logger.warning("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
+                  logger.warning("You are calling 'step()' even though this environment has already returned done = True. "
+                                 "You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
               self.steps_beyond_done += 1
               reward = 0.0
 
@@ -409,8 +423,10 @@ class HyrjaEnv(gym.Env):
 
     def _reset(self):
         pos = (-35, -5, -30, -7, -17, -17, -28, -28, -22, -22, -40, 0)
-        orb_pos = tuple(self.np_random.uniform(low=100, high=100, size=(70,)))
-        orb_dir = tuple(self.np_random.uniform(low=1, high=1, size=(70,)))
+        #orb_pos = tuple(self.np_random.uniform(low=100, high=100, size=(70,)))
+        orb_pos = tuple(self.np_random.uniform(low=0, high=0, size=(70,)))
+        #orb_dir = tuple(self.np_random.uniform(low=1, high=1, size=(70,)))
+        orb_dir = tuple(self.np_random.uniform(low=0, high=0, size=(70,)))
         eye_pos = (0, 0)
         knock_cd = tuple(self.np_random.uniform(low=23.5, high=24.5, size=(1,)))
         ult_cd = tuple(self.np_random.uniform(low=8, high=9, size=(1,)))
