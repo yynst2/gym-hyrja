@@ -27,12 +27,12 @@ predict = tf.argmax(Qout,1)         # max Q_network for next action | argmax(inp
 # Below we obtain the loss by taking the sum of squares difference between the target and prediction Q values.
 nextQ = tf.placeholder(shape=[1,32768],dtype=tf.float32)        # next Q value for 4 actions
 loss = tf.reduce_sum(tf.square(nextQ - Qout))       # summation of squared loss
-trainer = tf.train.GradientDescentOptimizer(learning_rate=0.1)  # set optimization method
+trainer = tf.train.GradientDescentOptimizer(learning_rate=1)  # set optimization method
 updateModel = trainer.minimize(loss)        # set objective function
-learning_rate=0.01
+
 y=0.99  # discount rate
 #
-exploration_rate_const=0.2
+exploration_rate_const=0.05
 action_map={0:[-1,-1,-1],
             1:[-1,-1,0],
             2: [-1, -1, 1],
@@ -95,14 +95,14 @@ with tf.Session() as sess:
     # initialize weights
     sess.run(tf.global_variables_initializer())
     print("variable initalized, env reset, start first trial")
+    prev_ = 0
+    iter=0
     for _ in range(15000000):
       env.render()
       obs=[]
       for k1 in env.state:
         for k2 in k1:
             obs.append(k2)
-      #print("obs is: ",obs)
-      #time.sleep(3)
       #print("start calculate Q values: ")
       obs=np.reshape(obs,(-1,187))
       action_index, allQ = sess.run([predict, Qout], feed_dict={inputs1:obs})  # var:new_data for feeding
@@ -129,11 +129,9 @@ with tf.Session() as sess:
       # results
       if done:
           # report
-          # print (cumulative_reward, " total dmg done")
-          print(obs[-1][-1]*100,"% BOSS remaining HP"," steps: ",_)
-          # reset stuffs
-          # time.sleep(3)
+          print("iter: ",iter,", ", obs[-1][-1]*100,"% BOSS remaining HP"," steps: ",_-prev_)
           obs=env.reset()
-          #cumulative_reward=0
+          iter+=1
+          prev_=_
     # env.close()
 

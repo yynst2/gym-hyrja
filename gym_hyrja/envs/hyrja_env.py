@@ -16,8 +16,8 @@ class HyrjaEnv(gym.Env):
 
     def __init__(self):
         self.timespan = 0.02
-        # self.buff = 4.2
-        self.buff = 3.5
+        self.buff = 4.2
+        #self.buff = 3.5        # Ynst
         self.boss_speed = 12
         self.boss_hp = 82234248
         self.boss_dps = 500000
@@ -26,8 +26,8 @@ class HyrjaEnv(gym.Env):
         self.dd_dps = 1000000
         self.dd_move_discount = 0.4
         self.melee_attack_range = 8
-        # self.ranged_attack_range = 40
-        self.ranged_attack_range = 10
+        self.ranged_attack_range = 40
+        # self.ranged_attack_range = 10     # Ynst
         self.healer_hps = 1000000
         self.healer_move_discount = 0.4
         self.tank_spell_coeff = 0.7
@@ -35,15 +35,17 @@ class HyrjaEnv(gym.Env):
         self.tank_dps = 500000
         self.tank_threat_coeff = 5.0
         # self.player_speed = 8
-        self.player_speed = 4
+        self.player_speed = 8      # Ynst
         self.sanctify_damage = 170625
         self.sanctify_splash_damage = 121875
         self.sanctify_orb_speed = 5
         self.sanctify_orb_range = 5
         self.eye_of_the_storm_damage = 132600
         self.eye_of_the_storm_reduction = 144000
-        self.eye_of_the_storm_shelter_range = 10
-        self.shield_of_light_damage = 774881
+        #self.eye_of_the_storm_shelter_range = 10
+        self.eye_of_the_storm_shelter_range = 30        # Ynst
+        # self.shield_of_light_damage = 774881
+        self.shield_of_light_damage = 774881 *0.5        # Ynst
         self.shield_of_light_knock_distance = 60
         self.shield_of_light_range = 5
         self.expel_light_damage = 210600
@@ -79,7 +81,10 @@ class HyrjaEnv(gym.Env):
 
     def point_distance(self, x1, y1, x2, y2):
         return math.sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2))
-
+    def cal_group_center(self):     # Ynst calculate group center, including boss. The idea is to have some rewards
+                                    # to get close to group center, but tradeoff with moving panelty, this should be
+                                    # beneficial later on to deal with shield of light knockback and eye of storm AOE
+        pass
     def move_towards_direction(self, x, y, dirx, diry, speed, restricted):
         normalizer = math.sqrt(dirx * dirx + diry * diry)
         norm_x = dirx * speed * self.timespan / normalizer
@@ -259,6 +264,8 @@ class HyrjaEnv(gym.Env):
           move[x] = action[3*x]
           move_dir[2*x] = action[3*x+1]
           move_dir[2*x+1] = action[3*x+2]
+        # actual move, give reward if out of range
+        prev_pos=pos
         for x in range(0,5):
           if hp[x] > 0 and move[x] > 0:
             pos[2*x], pos[2*x+1] = self.move_towards_direction(pos[2*x], pos[2*x+1], move_dir[2*x], move_dir[2*x+1], self.player_speed, True)
@@ -269,25 +276,45 @@ class HyrjaEnv(gym.Env):
         if tank_hp > 0 and self.point_distance(pos[0], pos[1], pos[10], pos[11]) <= self.melee_attack_range:
           #dmg = self.np_random.uniform(low=0.5, high=1.5, size=(1,))[0] * self.tank_dps * self.timespan / (self.boss_hp * self.buff)
           dmg = self.tank_dps * self.timespan / (
-          self.boss_hp * self.buff)
+          self.boss_hp * self.buff)     # Ynst
           if dmg > boss_hp:
             dmg = boss_hp
           stat[0] = stat[0] + dmg
           boss_hp = boss_hp - dmg
           reward = reward + dmg
+        if tank_hp > 0 and self.point_distance(pos[0],      # little bit reward for moving to boss
+                                                 pos[1],
+                                                 pos[10],
+                                                 pos[11]) > self.melee_attack_range and self.point_distance(prev_pos[0],
+                                                                                                            prev_pos[1],
+                                                                                                            pos[10],
+                                                                                                            pos[11]) > self.point_distance(
+                  pos[0], pos[1], pos[10], pos[11]):
+          reward = reward + 0.1 * self.timespan / (self.boss_hp / (self.dd_dps * 5))
+        # add in new reward for moving to group center
+
         if warrior_hp > 0 and self.point_distance(pos[2], pos[3], pos[10], pos[11]) <= self.melee_attack_range:
           # dmg = self.np_random.uniform(low=0.5, high=1.5, size=(1,))[0] * self.dd_dps * self.timespan / (self.boss_hp * self.buff)
           dmg =  self.dd_dps * self.timespan / (
-          self.boss_hp * self.buff)
+          self.boss_hp * self.buff)     # Ynst
           if dmg > boss_hp:
             dmg = boss_hp
           stat[1] = stat[1] + dmg
           boss_hp = boss_hp - dmg
           reward = reward + dmg
+        if warrior_hp > 0 and self.point_distance(pos[0],
+                                                 pos[1],
+                                                 pos[10],
+                                                 pos[11]) > self.melee_attack_range and self.point_distance(prev_pos[0],
+                                                                                                            prev_pos[1],
+                                                                                                            pos[10],
+                                                                                                            pos[11]) > self.point_distance(
+                  pos[0], pos[1], pos[10], pos[11]):
+          reward = reward + 0.1 * self.timespan / (self.boss_hp / (self.dd_dps * 5))
         if mage_hp > 0 and self.point_distance(pos[4], pos[5], pos[10], pos[11]) <= self.ranged_attack_range:
           # dmg = self.np_random.uniform(low=0.5, high=1.5, size=(1,))[0] * self.dd_dps * self.timespan / (self.boss_hp * self.buff)
           dmg = self.dd_dps * self.timespan / (
-              self.boss_hp * self.buff)
+              self.boss_hp * self.buff)     # Ynst
           if move[2] > 0:
             dmg = dmg * self.dd_move_discount
           if dmg > boss_hp:
@@ -295,27 +322,48 @@ class HyrjaEnv(gym.Env):
           stat[2] = stat[2] + dmg
           boss_hp = boss_hp - dmg
           reward = reward + dmg
+        if mage_hp > 0 and self.point_distance(pos[0],
+                                             pos[1],
+                                             pos[10],
+                                             pos[11]) > self.ranged_attack_range and self.point_distance(prev_pos[0],
+                                                                                                        prev_pos[1],
+                                                                                                        pos[10],
+                                                                                                        pos[11]) > self.point_distance(
+              pos[0], pos[1], pos[10], pos[11]):
+          reward = reward + 0.1 * self.timespan / (self.boss_hp / (self.dd_dps * 5))
         if hunter_hp > 0 and self.point_distance(pos[6], pos[7], pos[10], pos[11]) <= self.ranged_attack_range:
           # dmg = self.np_random.uniform(low=0.5, high=1.5, size=(1,))[0] * self.dd_dps * self.timespan / (self.boss_hp * self.buff)
           dmg = self.dd_dps * self.timespan / (
-              self.boss_hp * self.buff)
+              self.boss_hp * self.buff)     # Ynst
           if dmg > boss_hp:
             dmg = boss_hp
           stat[3] = stat[3] + dmg
           boss_hp = boss_hp - dmg
           reward = reward + dmg
+        if hunter_hp > 0 and self.point_distance(pos[0],
+                                               pos[1],
+                                               pos[10],
+                                               pos[11]) > self.ranged_attack_range and self.point_distance(prev_pos[0],
+                                                                                                           prev_pos[1],
+                                                                                                           pos[10],
+                                                                                                           pos[
+                                                                                                               11]) > self.point_distance(
+              pos[0], pos[1], pos[10], pos[11]):
+          reward = reward + 0.1 * self.timespan / (self.boss_hp / (self.dd_dps * 5))
         hp = [tank_hp, warrior_hp, mage_hp, hunter_hp, priest_hp, boss_hp]
 
         # player dealing heal
-        heal_dist = self.np_random.uniform(low=0, high=1, size=(5,))
+        # heal_dist = self.np_random.uniform(low=0, high=1, size=(5,))
+        heal_dist = self.np_random.uniform(low=1, high=1, size=(5,))        # Ynst
         for x in range(0,5):
           heal_dist[x] = heal_dist[x] * (1 - hp[x])
           if hp[x] <= 0 or self.point_distance(pos[2*x], pos[2*x+1], pos[8], pos[9]) > self.ranged_attack_range:
             heal_dist[x] = -1
         heal_target = np.argmax(heal_dist)
-        if priest_hp > 0:
+        # need heal reward
+        if priest_hp > 0:   # healer also needs movement reward and group reward
           # heal = self.np_random.uniform(low=0.5, high=1.5, size=(1,))[0] * self.healer_hps * self.timespan
-          heal = self.healer_hps * self.timespan
+          heal = self.healer_hps * self.timespan    # Ynst
           if heal_target == 0:
             heal = heal / self.tank_hp
           else:
@@ -340,7 +388,7 @@ class HyrjaEnv(gym.Env):
             pos[10], pos[11] = self.move_towards_point(pos[10], pos[11], pos[2*boss_target], pos[2*boss_target+1], self.boss_speed, True)
           else:
             # dmg = self.np_random.uniform(low=0.5, high=1.5, size=(1,))[0] * self.boss_dps * self.timespan * self.buff
-            dmg =  self.boss_dps * self.timespan * self.buff
+            dmg =  self.boss_dps * self.timespan * self.buff    # Ynst
             if boss_target == 0:
               dmg = dmg * self.tank_melee_coeff / self.tank_hp
             else:
@@ -350,6 +398,12 @@ class HyrjaEnv(gym.Env):
             hp[boss_target] = hp[boss_target] - dmg
 
         tank_hp, warrior_hp, mage_hp, hunter_hp, priest_hp, boss_hp = tuple(hp)
+
+        # healing reward
+        reward=reward + (tank_hp+warrior_hp+mage_hp+hunter_hp+priest_hp)/5 * \
+                        self.timespan / (self.boss_hp/(self.dd_dps*5))  # boss_hp/dd_dps*5 is an approximate to actual
+                                                                        # time needed for the fight, don't want to add to
+                                                                        # much reward to healing
 
         # boss spells
         if not is_casting:
@@ -461,7 +515,8 @@ class HyrjaEnv(gym.Env):
             self.orb_trans = [rendering.Transform() for i in range(0,35)]
             for i in range(0,35):
               orb = rendering.make_circle(2)
-              orb.set_color(1,1,0.2)
+              #orb.set_color(1, 1, 0.2)
+              orb.set_color(1,0.9,0.1)      # Ynst
               orb.add_attr(self.orb_trans[i])
               self.viewer.add_geom(orb)
             boss = rendering.make_circle(5)
